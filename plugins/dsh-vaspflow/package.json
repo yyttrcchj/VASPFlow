@@ -1,6 +1,6 @@
 {
   "name": "dsh-vaspflow",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "VASP 科研助手 for DeepSeek Harness 0.2: 右侧 VASP 任务面板（任务扫描、收敛曲线、3D 结构、文件浏览）+ 共享 Node 数据服务，vasp_* 工具仅在随附的 VASP Agent 预设中可用。",
   "type": "module",
   "main": "./lib/index.js",
