@@ -1,7 +1,7 @@
 {
   "name": "dsh-vaspflow",
-  "version": "0.2.4",
-  "description": "VaspFlow for DeepSeek Harness: right-dock VASP task panel plus a shared Node data service whose vasp_* tools are available only in the bundled VASP Agent preset.",
+  "version": "0.3.0",
+  "description": "VASP 科研助手 for DeepSeek Harness 0.2: 右侧 VASP 任务面板（任务扫描、收敛曲线、3D 结构、文件浏览）+ 共享 Node 数据服务，vasp_* 工具仅在随附的 VASP Agent 预设中可用。",
   "type": "module",
   "main": "./lib/index.js",
   "bin": {
@@ -16,31 +16,43 @@
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./preset-tools": {
+      "default": "./preset/vasp/tools/vaspflow-tools.mjs"
+    },
+    "./preset-tool-only-output": {
+      "default": "./preset/vasp/tools/tool-only-output.mjs"
+    }
   },
   "files": [
-    "lib",
+    "INSTALL_FOR_AGENT.md",
+    "README.md",
     "cordis.patch.yml",
+    "lib",
     "preset",
+    "preset/vasp.patch.yml",
     "scripts/install-dsh.mjs",
-    "scripts/install-preset.mjs",
-    "README.md"
+    "scripts/install-preset.mjs"
   ],
   "license": "MIT",
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": [
+        "./cordis.patch.yml",
+        "./preset/vasp.patch.yml"
+      ]
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-connection"
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
       ],
       "platform": "web"
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": ">=0.1.7-rc.2 <0.3.0-0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -63,12 +75,31 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-tools": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "esbuild": "^0.28.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "vasp",
+    "dft",
+    "first-principles",
+    "science"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/21271122/VASPFlow.git",
+    "directory": "plugins/dsh-vaspflow"
+  },
+  "homepage": "https://github.com/21271122/VASPFlow#readme",
+  "bugs": {
+    "url": "https://github.com/21271122/VASPFlow/issues"
   }
 }

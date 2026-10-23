@@ -4,19 +4,21 @@
 
 > **当前形态**：DSH 插件（`plugins/dsh-vaspflow`）+ `vasp` Agent 预设（科研助手模式）。仓库前身是 Electron 桌面应用，现聚焦于 DSH 插件化形态。
 
+> **关于本仓库**：这是 [`21271122/VASPFlow`](https://github.com/21271122/VASPFlow) 的 fork，新增了 **DSH 0.2.x 适配**。原项目版权归其贡献者所有，按 MIT 协议分发；本 fork 的修改同样以 MIT 发布。上游地址见 `upstream` remote。
+
 ---
 
 ## 兼容性
 
-当前开发和运行基线如下：
+| 项目 | 本 fork 已验证版本 | 上游原版 |
+|---|---|---|
+| DSH | `0.2.1-rc.2`（`0.2.x` 全线） | 仅 `0.1.0-rc.6` |
+| Node.js | `18` 或更高版本 | 同左 |
+| 插件依赖安装器 | `pnpm`（DSH 自带或自行安装） | 同左 |
 
-| 项目 | 已验证版本 |
-|---|---|
-| DSH | `0.1.0-rc.6` |
-| Node.js | `18` 或更高版本 |
-| 插件依赖安装器 | `pnpm` |
+本 fork 已完成 DSH 0.2 适配，包括槽位化客户端挂载、`dsh.bundle.patch` 预设声明、Lexical 输入框注入等；详见 [`plugins/dsh-vaspflow/README.md`](plugins/dsh-vaspflow/README.md) 的「适配要点」。
 
-本插件尚未适配 DSH `0.1.2-rc.1` 的新版客户端模块体系。开发时请保持 DSH `0.1.0-rc.6`，并使用 `pnpm install --frozen-lockfile`，不要直接执行依赖升级命令。
+> 需要 DSH `0.1.x` 请使用上游原版。
 
 ---
 

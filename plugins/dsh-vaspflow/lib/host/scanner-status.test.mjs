@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { clearScanCache, scanProject, scanSingleDir } from './scanner.js';
 
 function fixture() {
@@ -181,7 +181,10 @@ test('B1-P3 emits breadth-first discovered placeholders before a child is scanne
     await scanProject(root, { onEvent: (event) => events.push(event) });
     const discovered = events.findIndex((event) => event.type === 'directory-discovered' && event.directory.rel_path.endsWith('A'));
     const scanned = events.findIndex((event) => event.type === 'directory-scanned' && event.directory.rel_path.endsWith('A'));
-    const taskScanned = events.findIndex((event) => event.type === 'directory-scanned' && event.directory.rel_path.endsWith('A\\B'));
+    // Build the separator from the runtime: the fixture uses the platform's sep,
+    // so a literal 'A\\B' only matches on Windows.
+    const taskSuffix = ['A', 'B'].join(sep);
+    const taskScanned = events.findIndex((event) => event.type === 'directory-scanned' && event.directory.rel_path.endsWith(taskSuffix));
     assert.ok(discovered >= 0);
     assert.ok(discovered < scanned);
     assert.ok(scanned < taskScanned);

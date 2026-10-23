@@ -460,12 +460,12 @@ export function Panel(props: PanelProps) {
         flex: 'none', display: 'flex', alignItems: 'center', gap: 6,
         padding: '0 10px', height: 44, borderBottom: '1px solid var(--dsw-alias-border-l2, #e5e6eb)',
       }}>
-        <span style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap' }}>VASP</span>
+        <span style={{ fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap' }}>VASP</span>
         {workspaceItems.length > 0 && (
           <Select
             size="small"
             placeholder="从工作区"
-            style={{ width: 92, flexShrink: 0 }}
+            style={{ width: 150, maxWidth: 180, flexShrink: 0 }}
             open={workspaceOpen}
             onDropdownVisibleChange={setWorkspaceOpen}
             onChange={(id) => {
@@ -521,23 +521,46 @@ export function Panel(props: PanelProps) {
       {hasTree && (
         <div style={{
           flex: 'none', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
-          padding: '7px 10px', borderBottom: '1px solid var(--dsw-alias-border-l2, #e5e6eb)', fontSize: 14,
+          padding: '9px 10px', borderBottom: '1px solid var(--dsw-alias-border-l2, #e5e6eb)', fontSize: 16,
         }}>
           <span style={{ color: '#1677ff', fontWeight: 600 }}>任务 {stats.total}</span>
           <span style={{ color: '#8c8c8c' }}>目录 {directories.length}</span>
-          {scanProgress && <span style={{ color: '#1677ff', fontSize: 13 }}>已扫描 {stats.total} 个任务，仍在检查 {Math.max(0, scanProgress.discoveredDirectories - scanProgress.scannedDirectories)} 个目录</span>}
+          {scanProgress && <span style={{ color: '#1677ff', fontSize: 15 }}>已扫描 {stats.total} 个任务，仍在检查 {Math.max(0, scanProgress.discoveredDirectories - scanProgress.scannedDirectories)} 个目录</span>}
           {[
             ['NO_OUTPUT_EVIDENCE', '未输出', '#faad14'],
             ['TASK_COMPLETED', '完成', '#52c41a'],
             ['RUNNING', '运行中', '#1677ff'],
             ['ERROR_DETECTED', '错误', '#ff4d4f'],
             ['UNKNOWN', '待检查', '#8c8c8c'],
-          ].map(([code, label, color]) => (
-            <Button key={code} type="text" size="small" style={{ color, padding: 0, height: 22, fontSize: 14 }}
-              onClick={() => panelStore.setFilterStatus(filterStatus === code ? null : code)}>
-              {label} {stats[code as keyof typeof stats]}
-            </Button>
-          ))}
+          ].map(([code, label, color]) => {
+            const active = filterStatus === code;
+            return (
+              <Button
+                key={code}
+                type="text"
+                size="small"
+                aria-pressed={active}
+                title={active ? `已筛选「${label}」，再次点击取消` : `筛选「${label}」`}
+                style={{
+                  color,
+                  padding: active ? '0 6px' : 0,
+                  height: 22,
+                  fontSize: 14,
+                  borderRadius: 6,
+                  background: active ? 'rgba(22,93,255,.12)' : 'transparent',
+                  boxShadow: active ? `inset 0 0 0 1px ${color}55` : 'none',
+                  fontWeight: active ? 600 : 400,
+                }}
+                onClick={() => {
+                  panelStore.setFilterStatus(active ? null : code);
+                  // Surface the filtered list so the click has a visible effect
+                  // even when no task is selected yet (the list lives in the popup).
+                  setListOpen(true);
+                }}>
+                {label} {stats[code as keyof typeof stats]}
+              </Button>
+            );
+          })}
           <span style={{ flex: 1 }} />
           <Popover
             trigger="click"
@@ -545,8 +568,9 @@ export function Panel(props: PanelProps) {
             open={listOpen}
             onOpenChange={setListOpen}
             overlayClassName="vaspflow-task-popover"
+            rootClassName="vaspflow-task-popover"
             content={
-              <div style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ width: 480, maxWidth: '70vw', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Input
                     size="small"
@@ -560,7 +584,7 @@ export function Panel(props: PanelProps) {
                   <Select
                     size="small"
                     placeholder="状态"
-                    style={{ width: 68 }}
+                    style={{ width: 104, flexShrink: 0 }}
                     allowClear
                     value={filterStatus}
                     onChange={(v) => panelStore.setFilterStatus(v ?? null)}
@@ -575,7 +599,7 @@ export function Panel(props: PanelProps) {
                   <Select
                     size="small"
                     placeholder="收敛"
-                    style={{ width: 68 }}
+                    style={{ width: 104, flexShrink: 0 }}
                     allowClear
                     value={filterConverged}
                     onChange={(v) => panelStore.setFilterConverged(v ?? null)}
@@ -615,7 +639,7 @@ export function Panel(props: PanelProps) {
           <Empty style={{ marginTop: 30 }} description="点击「任务列表」选择任务" />
         ) : (
           <>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <Tooltip placement="top" title={copiedPath === selectedPath ? '已复制绝对路径' : `${selectedPath} · 可拖至结构卡片`}>
                   <span
@@ -631,7 +655,7 @@ export function Panel(props: PanelProps) {
                         void copySelectedPath();
                       }
                     }}
-                    style={{ fontSize: 16, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1 1 160px', cursor: 'grab' }}
+                    style={{ fontSize: 17, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1 1 160px', cursor: 'grab' }}
                   >
                     {selectedParent && <Text type="secondary">{selectedParent} / </Text>}
                     <Text strong>{selectedTask.label}</Text>
@@ -664,14 +688,14 @@ export function Panel(props: PanelProps) {
                 </span>
               </div>
               {selectedIsVaspTask ? (
-                <div style={{ display: 'flex', gap: '4px 10px', flexWrap: 'wrap', marginTop: 6, fontSize: 14 }}>
+                <div style={{ display: 'flex', gap: '6px 12px', flexWrap: 'wrap', marginTop: 8, fontSize: 16 }}>
                   <Text type="secondary">体系：{selectedTask.system}</Text>
                   <Text type="secondary">类型：{selectedTask.task_type?.label ?? '—'}</Text>
                   <Text type="secondary">离子步：{selectedTask.n_ion_steps}</Text>
                   <Text type="secondary">最终能量：{selectedTask.final_energy?.toFixed(6) ?? '—'} eV</Text>
                 </div>
               ) : <Text type="secondary">普通目录</Text>}
-              {inputCheckError && <div style={{ marginTop: 6, color: '#ff4d4f', fontSize: 14 }}>输入检查未完成：{inputCheckError}</div>}
+              {inputCheckError && <div style={{ marginTop: 8, color: '#ff4d4f', fontSize: 15 }}>输入检查未完成：{inputCheckError}</div>}
             </div>
             <Tabs
               size="small"
@@ -795,13 +819,13 @@ function TaskStatusEvidence({ task }: { task: Task }) {
           ? '#faad14'
           : '#8c8c8c';
   return (
-    <div style={{ fontSize: 15, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
+    <div style={{ fontSize: 17, lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 6 }}>
       <div style={{ padding: '12px 14px', border: '1px solid #30384d', borderLeft: `4px solid ${statusColor}`, borderRadius: 8, background: '#171f32' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-          <Text strong style={{ fontSize: 16 }}>{status?.label ?? '待检查'}</Text>
-          <Text type="secondary" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>扫描于 {formatDateTime(status?.observedAt)}</Text>
+          <Text strong style={{ fontSize: 19 }}>{status?.label ?? '待检查'}</Text>
+          <Text type="secondary" style={{ fontSize: 15, whiteSpace: 'nowrap' }}>扫描于 {formatDateTime(status?.observedAt)}</Text>
         </div>
-        <div style={{ marginTop: 5, fontSize: 16 }}>{status?.reason ?? '旧版任务记录尚无状态理由；请刷新项目。'}</div>
+        <div style={{ marginTop: 6, fontSize: 17 }}>{status?.reason ?? '旧版任务记录尚无状态理由；请刷新项目。'}</div>
         {primaryEvidence?.file ? <Text type="secondary" style={{ display: 'block', marginTop: 5, fontSize: 13 }}>依据：{primaryEvidence.file}</Text> : null}
         {primaryEvidence?.excerpt ? <div style={{ marginTop: 5, padding: '5px 8px', color: '#b7c1d8', background: '#101726', borderRadius: 4, fontFamily: 'monospace', fontSize: 13, whiteSpace: 'pre-wrap' }}>{primaryEvidence.excerpt}</div> : null}
         {extraEvidence.length ? <div style={{ marginTop: 7, color: '#b7c1d8', fontSize: 13 }}>其他发现：{extraEvidence.map((item) => item.message).join('；')}</div> : null}

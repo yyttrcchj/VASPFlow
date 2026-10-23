@@ -1,0 +1,38 @@
+VASPFlow
+========
+
+本仓库是 21271122/VASPFlow 的 fork。
+
+上游项目
+--------
+https://github.com/21271122/VASPFlow
+Copyright (c) 2026 VASPFlow contributors
+Licensed under the MIT License (见 LICENSE)。
+
+本 fork 的修改
+--------------
+以适配 DeepSeek Harness 0.2.x 为目标，主要改动位于 plugins/dsh-vaspflow：
+
+1. 版本门禁：从仅接受 DSH 0.1.0-rc.6 放宽到 0.2.x。
+2. 客户端挂载：由 [data-dsh-frame] 网格轨道 + DOM 自愈插入，
+   改为 DSH 0.2 的槽位体系（sidebar.panellist + main）。
+3. 客户端依赖声明：dsh-client-runtime / dsh-client-connection
+   → dsh-client-locale / dsh-client-ui-layout / dsh-client-ui-sidebar。
+4. 可选服务 workspaces 改为按需获取，避免静态注入导致激活失败。
+5. 对话输入框：<textarea> → Lexical contenteditable，改用合成 paste 注入；
+   面板占用 main 槽位时先切回会话再等待编辑器挂载。
+6. Agent 预设：由复制到 .agent-presets/ 改为 @deepseek-ai/dsh-agent-preset
+   条目 + dsh.bundle.patch 声明（DSH 0.2 不再扫描预设目录）。
+7. 预设修正：persona.text → persona.prefix；本地工具改为包子路径引用；
+   dsh-workflow-worker-thread → dsh-workflow-ptc。
+8. 界面可读性：补齐槽位容器的样式作用域属性、引入 antd 字号 token、
+   移除覆盖样式的内联 fontSize、加宽筛选控件。
+9. 发布工程：加强 scripts/verify.mjs 的发布前校验；修复
+   scanner-status.test.mjs 的跨平台路径断言。
+
+上述修改同样以 MIT License 发布，版权声明保留在上游与 fork 的贡献者处。
+
+许可
+----
+MIT。完整条款见 LICENSE。分发本软件或其重要部分时，
+必须保留上述版权声明与许可声明。

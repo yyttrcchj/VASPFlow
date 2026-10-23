@@ -72,7 +72,7 @@ const ConvergenceChart: React.FC<{ taskId?: number; series?: ConvergenceResponse
 
   return (
     <div>
-      <div title={`数据来源: ${source}`} style={{ marginBottom: 2, fontSize: 11, color: 'var(--dsw-alias-label-tertiary, #999)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+      <div title={`数据来源: ${source}`} style={{ marginBottom: 2, fontSize: 13, color: 'var(--dsw-alias-label-tertiary, #999)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
         数据来源: {source}
       </div>
       <div style={{ marginBottom: 4 }}>

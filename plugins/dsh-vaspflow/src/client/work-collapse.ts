@@ -34,6 +34,11 @@ function setAttr(node: HTMLElement, name: string, value: string | null) {
 }
 
 export function mountWorkCollapse(sessions: any): () => void {
+  // The host may not expose a `sessions.list` snapshot store on every build;
+  // degrade to a no-op instead of throwing, so one optional feature cannot
+  // abort the whole panel mount.
+  const reader = sessions?.list;
+  if (!reader || typeof reader.getSnapshot !== 'function') return () => {};
   const expanded = new Set<string>();
   let scheduled = false;
   let disposed = false;
@@ -41,9 +46,9 @@ export function mountWorkCollapse(sessions: any): () => void {
   const update = () => {
     scheduled = false;
     if (disposed) return;
-    const state = sessions.list.getSnapshot();
-    const sessionId = state.current;
-    const enabled = !!sessionId && state.byId[sessionId]?.agentPreset === 'vasp';
+    const state = reader.getSnapshot();
+    const sessionId = state?.current;
+    const enabled = !!sessionId && state?.byId?.[sessionId]?.agentPreset === 'vasp';
     for (const flow of document.querySelectorAll<HTMLElement>(FLOW)) {
       const desired = new Map<HTMLElement, { first: boolean; open: boolean; label?: string; key?: string }>();
       if (enabled) for (const run of workRuns(flow)) {
@@ -90,7 +95,7 @@ export function mountWorkCollapse(sessions: any): () => void {
   };
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
-  const unsubscribe = sessions.list.subscribe(schedule);
+  const unsubscribe = typeof reader.subscribe === 'function' ? reader.subscribe(schedule) : () => {};
   schedule();
   return () => {
     disposed = true;

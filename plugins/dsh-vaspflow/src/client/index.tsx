@@ -21,6 +21,7 @@ import type { BuildTaskDetail } from './store';
 import type { Task } from './api';
 import { readStructureDrag, STRUCTURE_DRAG_TYPE } from './structure-drag';
 import { scrollExpandedTreeRow } from './tree-scroll';
+import { mountViaSlots } from './slot-mount';
 
 const ENTRY_ATTR = 'data-dsh-vaspflow-entry';
 const PANEL_ATTR = 'data-dsh-vaspflow-panel';
@@ -29,7 +30,7 @@ const ENTRY_LABEL = 'VASP';
 const ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3.2"/><ellipse cx="8" cy="8" rx="7" ry="2.8" transform="rotate(-30 8 8)"/><path d="M8 4.8v6.4"/></svg>';
 
 const CSS = [
-  `[${PANEL_ATTR}]{display:flex;flex-direction:column;min-width:0;overflow:hidden;border-left:1px solid var(--dsw-alias-border-l2,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#1f2329);font-family:var(--dsw-font-family,sans-serif);font-size:16px}`,
+  `[${PANEL_ATTR}]{display:flex;flex-direction:column;min-width:0;overflow:hidden;border-left:1px solid var(--dsw-alias-border-l2,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#1f2329);font-family:var(--dsw-font-family,sans-serif);font-size:17px}`,
   `[${ENTRY_ATTR}]{width:100%;height:34px;display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--dsw-alias-label-secondary,#454d5f);background:none;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;font-size:14px}`,
   `[${ENTRY_ATTR}]:hover{background:var(--dsw-specific-sidebar-nav-item-hover,rgba(0,0,0,.04));color:var(--dsw-alias-label-primary,#1f2329)}`,
   `[${ENTRY_ATTR}][data-active]{background:var(--dsw-specific-sidebar-nav-item-active,rgba(22,93,255,.1));color:var(--dsw-alias-label-primary,#1f2329);font-weight:600}`,
@@ -40,19 +41,26 @@ const CSS = [
   // Compact task tree (panel + popup): tighter rows, smaller indent, arrow
   // close to the name. The popup renders on <body>, OUTSIDE the panel, so it
   // needs its own scope.
-  `[${PANEL_ATTR}] .ant-tree-treenode, .vaspflow-task-popover .ant-tree-treenode{padding:0!important;line-height:20px}`,
-  `[${PANEL_ATTR}] .ant-tree-node-content-wrapper, .vaspflow-task-popover .ant-tree-node-content-wrapper{padding:0 4px!important;min-height:20px!important;line-height:20px!important}`,
-  `[${PANEL_ATTR}] .ant-tree-switcher, .vaspflow-task-popover .ant-tree-switcher{width:14px!important;margin-right:0!important}`,
-  `[${PANEL_ATTR}] .ant-tree-indent-unit, .vaspflow-task-popover .ant-tree-indent-unit{width:12px!important}`,
-  `[${PANEL_ATTR}] .ant-tree-title, .vaspflow-task-popover .ant-tree-title{font-size:14px!important}`,
+  `[${PANEL_ATTR}] .ant-tree-treenode, .vaspflow-task-popover .ant-tree-treenode{padding:2px 0!important;line-height:26px}`,
+  `[${PANEL_ATTR}] .ant-tree-node-content-wrapper, .vaspflow-task-popover .ant-tree-node-content-wrapper{padding:0 6px!important;min-height:26px!important;line-height:26px!important}`,
+  `[${PANEL_ATTR}] .ant-tree-switcher, .vaspflow-task-popover .ant-tree-switcher{width:20px!important;margin-right:2px!important;font-size:14px!important}`,
+  `[${PANEL_ATTR}] .ant-tree-indent-unit, .vaspflow-task-popover .ant-tree-indent-unit{width:18px!important}`,
+  `[${PANEL_ATTR}] .ant-tree-title, .vaspflow-task-popover .ant-tree-title{font-size:16px!important}`,
   `[${PANEL_ATTR}] .ant-tree, .vaspflow-task-popover .ant-tree{margin-top:2px}`,
   // Popup controls row: compact height and gaps.
-  '.vaspflow-task-popover .ant-input-affix-wrapper, .vaspflow-task-popover .ant-select-selector{font-size:14px!important}',
-  '.vaspflow-task-popover .ant-segmented{font-size:14px}',
+  '.vaspflow-task-popover .ant-input-affix-wrapper, .vaspflow-task-popover .ant-select-selector{font-size:15px!important;min-height:32px}',
+  '.vaspflow-task-popover .ant-segmented{font-size:15px}',
+  // Select dropdowns render in a body portal: give the option rows enough room
+  // so a two- or three-character label is never clipped to "完...".
+  '.ant-select-dropdown .ant-select-item{font-size:16px!important;min-height:34px;line-height:24px;padding:5px 12px!important;white-space:nowrap}',
+  '.ant-select-dropdown .ant-select-item-option-content{white-space:nowrap;overflow:visible;text-overflow:clip}',
+  // Keep the selected value readable inside the closed control as well.
+  '.vaspflow-task-popover .ant-select-selection-item{font-size:16px!important;overflow:visible;white-space:nowrap}',
+  '.vaspflow-task-popover .ant-select-selection-search-input{font-size:16px!important}',
   // Compact popup table rows + tighten popover body padding.
   '.vaspflow-task-popover .ant-popover-inner{padding:6px!important}',
-  '.vaspflow-task-popover .ant-table-cell{padding-top:4px!important;padding-bottom:4px!important;font-size:14px!important}',
-  '.vaspflow-task-popover .ant-table-thead > tr > th{padding-top:4px!important;padding-bottom:4px!important;font-size:14px!important}',
+  '.vaspflow-task-popover .ant-table-cell{padding-top:7px!important;padding-bottom:7px!important;font-size:15px!important}',
+  '.vaspflow-task-popover .ant-table-thead > tr > th{padding-top:7px!important;padding-bottom:7px!important;font-size:15px!important}',
   '.vaspflow-task-popover .ant-table-tbody > tr > td{padding-top:4px!important;padding-bottom:4px!important}',
   // Dark mode: force the 3D structure mount container to the dark background
   // even if the alias token is unresolved on some element paths.
@@ -66,8 +74,8 @@ const CSS = [
   '.vaspflow-task-popover .ant-popover-arrow{display:none}',
   // The host panel is intentionally readable at the same scale as a normal
   // conversation reply. Ant Design controls otherwise keep their 14px default.
-  `[${PANEL_ATTR}] .ant-btn,[${PANEL_ATTR}] .ant-input,[${PANEL_ATTR}] .ant-input-affix-wrapper input,[${PANEL_ATTR}] .ant-select-selection-item,[${PANEL_ATTR}] .ant-select-selection-placeholder,[${PANEL_ATTR}] .ant-tabs-tab,[${PANEL_ATTR}] .ant-tag{font-size:15px!important}`,
-  `[${PANEL_ATTR}] .ant-btn-sm{min-height:28px}`,
+  `[${PANEL_ATTR}] .ant-btn,[${PANEL_ATTR}] .ant-input,[${PANEL_ATTR}] .ant-input-affix-wrapper input,[${PANEL_ATTR}] .ant-select-selection-item,[${PANEL_ATTR}] .ant-select-selection-placeholder,[${PANEL_ATTR}] .ant-tabs-tab,[${PANEL_ATTR}] .ant-tag{font-size:16px!important}`,
+  `[${PANEL_ATTR}] .ant-btn-sm{min-height:32px}`,
   // Build tasks sit directly in the conversation. Details live in the dock.
   '[data-dsh-vaspflow-tool]{margin:12px 0;color:var(--dsw-alias-label-primary,#1f2329);font-size:13px;--vfp-tree-folder-bg:rgba(79,143,210,.08);--vfp-tree-leaf-bg:rgba(38,151,102,.09)}',
   'body[data-ds-dark-theme] [data-dsh-vaspflow-tool]{--vfp-tree-folder-bg:rgba(120,185,241,.09);--vfp-tree-leaf-bg:rgba(94,204,155,.11)}',
@@ -150,10 +158,10 @@ const CSS = [
   '[data-dsh-vaspflow-tool] .vfp-source-file small{margin-left:auto;color:var(--dsw-alias-label-secondary,#65746b)}',
   '[data-dsh-vaspflow-tool] .vfp-source-file>span:last-child{color:var(--dsw-alias-label-secondary,#65746b);white-space:nowrap}',
   '[data-dsh-vaspflow-tool] .vfp-source-file:hover>span:last-child{color:#3279bf}',
-  '[data-dsh-vaspflow-tool] .vfp-source-location{font-size:11px;color:var(--dsw-alias-label-tertiary,#999);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:4px 0}',
-  '.ant-modal .vfp-source-location{font-size:11px;color:var(--dsw-alias-label-tertiary,#999);overflow-wrap:anywhere;padding:4px 0}',
+  '[data-dsh-vaspflow-tool] .vfp-source-location{font-size:13px;color:var(--dsw-alias-label-tertiary,#999);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:4px 0}',
+  '.ant-modal .vfp-source-location{font-size:13px;color:var(--dsw-alias-label-tertiary,#999);overflow-wrap:anywhere;padding:4px 0}',
   '.ant-modal .vfp-file-preview{max-height:60vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--dsw-alias-bg-elevated,#f5f5f5);color:var(--dsw-alias-label-primary,#1f2329);padding:12px;font-size:12px;line-height:1.5}',
-  '.vfp-preview-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:11px}',
+  '.vfp-preview-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:13px}',
   '[data-dsh-vaspflow-tool] .vfp-discovery-section>details{border-top:1px solid var(--dsw-alias-border-l2,#d4ded5);padding:7px 0}',
   '[data-dsh-vaspflow-tool] .vfp-discovery .vfp-path-folder{border-top:0;padding:0}',
   '[data-dsh-vaspflow-tool] .vfp-discovery summary{cursor:pointer}',
@@ -192,7 +200,7 @@ const CSS = [
   '[data-dsh-vaspflow-tool] .vfp-source-flow>b{text-align:center;font-size:17px;font-weight:400;color:var(--dsw-alias-label-tertiary,#999)}',
   '[data-dsh-vaspflow-tool] .vfp-discovery-section{padding:8px 0;border-top:1px solid var(--dsw-alias-border-l2,#d4ded5)}',
   '[data-dsh-vaspflow-tool] .vfp-discovery-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px}',
-  '[data-dsh-vaspflow-tool] .vfp-discovery-heading span{font-size:11px;font-weight:400;color:var(--dsw-alias-label-secondary,#65746b)}',
+  '[data-dsh-vaspflow-tool] .vfp-discovery-heading span{font-size:13px;font-weight:400;color:var(--dsw-alias-label-secondary,#65746b)}',
   '[data-dsh-vaspflow-tool] .vfp-distribution-row>summary{position:relative;display:flex;justify-content:space-between;gap:12px;padding:7px 4px 9px;overflow:hidden}',
   '[data-dsh-vaspflow-tool] .vfp-distribution-row>summary i{position:absolute;bottom:0;left:0;height:3px;background:#48a884;border-radius:2px}',
   '[data-dsh-vaspflow-tool] .vfp-distribution-row>summary,[data-dsh-vaspflow-tool] .vfp-template-group>summary{box-sizing:border-box;align-items:center;min-height:30px;margin:3px 0;padding:5px 8px;border-radius:4px;background:var(--vfp-tree-folder-bg);list-style:none;cursor:pointer}',
@@ -206,7 +214,7 @@ const CSS = [
   '[data-dsh-vaspflow-tool] .vfp-coverage strong{text-align:right}',
   '[data-dsh-vaspflow-tool] .vfp-template-group>summary{display:flex;align-items:baseline;gap:12px;min-width:0}',
   '[data-dsh-vaspflow-tool] .vfp-template-group>summary .vfp-tree-muted{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-  '[data-dsh-vaspflow-tool] .vfp-discovery-foot{font-size:11px;line-height:1.45;padding:10px 0}',
+  '[data-dsh-vaspflow-tool] .vfp-discovery-foot{font-size:13px;line-height:1.45;padding:10px 0}',
   '[data-dsh-vaspflow-tool] .vfp-inspection-list{max-height:420px;overflow-y:auto;overflow-x:hidden}',
   '[data-dsh-vaspflow-tool] .vfp-inspection-list .vfp-path-tree{max-height:none;overflow:visible}',
   '[data-dsh-vaspflow-tool] .vfp-inspection-list .vfp-path-folder{border:0}',
@@ -218,7 +226,7 @@ const CSS = [
   '[data-dsh-vaspflow-tool] .vfp-inspection-list .vfp-inspection-item[open]>summary::before{content:"▾"}',
   '[data-dsh-vaspflow-tool] .vfp-inspection-list summary strong{min-width:0;overflow-wrap:anywhere}',
   '[data-dsh-vaspflow-tool] .vfp-inspection-list summary small{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary,#65746b)}',
-  '[data-dsh-vaspflow-tool] .vfp-state-chip{flex:none;padding:2px 7px;border-radius:10px;background:rgba(128,128,128,.15);font-size:11px}',
+  '[data-dsh-vaspflow-tool] .vfp-state-chip{flex:none;padding:2px 7px;border-radius:10px;background:rgba(128,128,128,.15);font-size:13px}',
   '[data-dsh-vaspflow-tool] .vfp-state-chip[data-status="PASS"],[data-dsh-vaspflow-tool] .vfp-state-chip[data-status="TASK_COMPLETED"]{color:#39ae78;background:rgba(39,157,105,.15)}',
   '[data-dsh-vaspflow-tool] .vfp-state-chip[data-status="FAIL"],[data-dsh-vaspflow-tool] .vfp-state-chip[data-status="ERROR_DETECTED"],[data-dsh-vaspflow-tool] .vfp-state-chip[data-status="error"]{color:#db6962;background:rgba(213,87,80,.15)}',
   '[data-dsh-vaspflow-tool] .vfp-state-chip[data-status="RUNNING"]{color:#69b5e5;background:rgba(85,166,217,.15)}',
@@ -363,40 +371,98 @@ function mountSidebarEntry(toggle: () => void, isOpen: () => boolean, subscribe:
 
 // ---- S5: conversation input prefill -----------------------------------------
 
-function findComposerTextarea(): HTMLTextAreaElement | null {
-  const selectors = [
-    '[data-dsh-composer] textarea',
-    '[class*="composer"] textarea',
-    '[data-pane="conversation"] textarea',
-    '[class*="inputArea"] textarea',
-  ];
-  for (const selector of selectors) {
-    const el = document.querySelector(selector);
-    if (el instanceof HTMLTextAreaElement) return el;
+/**
+ * Locate the conversation composer.
+ *
+ * DSH 0.2 renders the composer as a Lexical contenteditable div
+ * (`div[data-composer-input][role="textbox"]`); older builds used a plain
+ * `<textarea>`. Both shapes are supported.
+ */
+function findComposer(): HTMLElement | null {
+  const editable = document.querySelector('[data-composer-input]')
+    ?? document.querySelector('div[contenteditable="true"][role="textbox"]')
+    ?? document.querySelector('[data-composer] [contenteditable="true"]');
+  if (editable instanceof HTMLElement && editable.isContentEditable) return editable;
+  const textarea = document.querySelector('[data-dsh-composer] textarea')
+    ?? document.querySelector('[class*="composer"] textarea')
+    ?? document.querySelector('[data-pane="conversation"] textarea')
+    ?? document.querySelector('[class*="inputArea"] textarea');
+  return textarea instanceof HTMLTextAreaElement ? textarea : null;
+}
+
+/**
+ * Insert text into a Lexical contenteditable.
+ *
+ * A synthetic `paste` is the reliable path: Lexical's own paste handler
+ * translates it into editor state, whereas assigning `innerHTML` bypasses
+ * Lexical and leaves the model out of sync. If the paste is not handled we
+ * fall back to writing text nodes plus an `input` event.
+ */
+function pasteIntoEditable(el: HTMLElement, text: string): boolean {
+  el.focus();
+  try {
+    const transfer = new DataTransfer();
+    transfer.setData('text/plain', text);
+    const event = new ClipboardEvent('paste', {
+      clipboardData: transfer,
+      bubbles: true,
+      cancelable: true,
+    });
+    // Some engines drop clipboardData from the constructor; force it on.
+    if (event.clipboardData === null || event.clipboardData.getData('text/plain') !== text) {
+      Object.defineProperty(event, 'clipboardData', { value: transfer });
+    }
+    // A handled paste calls preventDefault, which makes dispatchEvent false.
+    const unhandled = el.dispatchEvent(event);
+    if (!unhandled) return true;
+  } catch {
+    // Fall through to the DOM fallback below.
   }
-  return null;
+
+  try {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    el.textContent = text;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Insert text into a plain textarea through the native value setter. */
+function setTextareaValue(el: HTMLTextAreaElement, text: string): boolean {
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+  if (setter) setter.call(el, text);
+  else el.value = text;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus();
+  el.setSelectionRange(text.length, text.length);
+  return true;
 }
 
 /**
  * Prefill the conversation input with a task context (editable) and focus it.
- * Uses native setter + input event so React-controlled textareas see the
- * change.
+ * Returns false when no composer can be found, so the caller can fall back to
+ * the clipboard.
  */
 function prefillConversationInput(text: string): boolean {
-  const textarea = findComposerTextarea();
-  if (textarea === null) return false;
-  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-  if (setter) setter.call(textarea, text);
-  else textarea.value = text;
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  textarea.focus();
-  textarea.setSelectionRange(text.length, text.length);
-  return true;
+  const target = findComposer();
+  if (target === null) return false;
+  if (target instanceof HTMLTextAreaElement) return setTextareaValue(target, text);
+  return pasteIntoEditable(target, text);
 }
 
 // ---- entry ------------------------------------------------------------------
 
-const inject = ['slots', 'sessions', 'workspaces', 'connection', 'settingsScope', 'locale'];
+// Only services the shell always provides. `workspaces` is optional and is
+// acquired through ctx.inject (see apply): statically requiring it would make
+// the whole plugin fail activation on hosts that do not serve it.
+const inject = ['slots', 'sessions', 'locale', 'layout'];
 
 /** Subscribe to the DSH dark-theme marker (body[data-ds-dark-theme]). */
 function subscribeDarkTheme(callback: () => void): () => void {
@@ -681,7 +747,25 @@ function PanelRoot(props: PanelProps) {
   return (
     <ConfigProvider
       locale={zhCN}
-      theme={{ algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}
+      theme={{
+        algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+        // One token drives every antd control, so the panel reads at the same
+        // scale as a normal conversation reply without per-component overrides.
+        token: {
+          fontSize: 16,
+          fontSizeSM: 14,
+          fontSizeLG: 18,
+          controlHeight: 36,
+          controlHeightSM: 32,
+          lineHeight: 1.65,
+        },
+        components: {
+          Tree: { titleHeight: 30, nodeSelectedBg: 'rgba(22,93,255,.12)' },
+          Table: { cellFontSize: 15, cellPaddingBlock: 8 },
+          Tabs: { titleFontSize: 16 },
+          Tag: { fontSizeSM: 13 },
+        },
+      }}
     >
       <Panel
         {...props}
@@ -731,9 +815,17 @@ function apply(ctx: any) {
   // picker stays populated as workspaces load/change.
   // DSH client API: ctx.workspaces.list is a snapshot store; getSnapshot()
   // returns { recentWorkspaceId, items: [{ workspaceId, path, name?, ... }] }.
+  // `workspaces` is an optional client service: acquire it when present.
+  let workspacesService: any;
+  try {
+    workspacesService = ctx.get?.('workspaces') ?? ctx.workspaces;
+  } catch {
+    workspacesService = undefined;
+  }
+
   const syncWorkspaces = () => {
     try {
-      const snap = ctx.workspaces.list.getSnapshot();
+      const snap = workspacesService?.list?.getSnapshot?.();
       const items = (snap?.items ?? []) as any[];
       panelStore.setWorkspaceItems(items.map((w) => ({
         value: w.workspaceId ?? w.id,
@@ -745,7 +837,7 @@ function apply(ctx: any) {
   };
   const unsubscribeWorkspaces = (() => {
     try {
-      return ctx.workspaces.list.subscribe(syncWorkspaces);
+      return workspacesService?.list?.subscribe?.(syncWorkspaces) ?? (() => {});
     } catch {
       return () => {};
     }
@@ -754,7 +846,7 @@ function apply(ctx: any) {
 
   const onPickWorkspace = (id: string) => {
     try {
-      const snap = ctx.workspaces.list.getSnapshot();
+      const snap = workspacesService?.list?.getSnapshot?.();
       const item = (snap?.items ?? []).find((w: any) => (w.workspaceId ?? w.id) === id);
       const path = item?.path ?? '';
       if (path) panelStore.setProjectPath(path);
@@ -765,10 +857,29 @@ function apply(ctx: any) {
 
   const toggle = () => panelStore.toggleOpen();
 
+  /**
+   * Hand a task context to the conversation composer.
+   *
+   * The VASP panel occupies the keyed `main` slot, so while it is open the
+   * conversation view (and its composer) is unmounted: the composer can only
+   * be found after switching the main area back. Switch first, then wait for
+   * the editor to mount before pasting.
+   */
   const handleAnalyzeTask = (task: Task, draft?: string) => {
-    const rootPath = (panelRootPath());
+    const rootPath = panelRootPath();
     const context = draft ?? buildTaskContext(task, rootPath);
-    if (!prefillConversationInput(context)) {
+
+    const focusConversation = () => {
+      try {
+        ctx.layout?.selectPanel?.(null);
+      } catch {
+        // ignore
+      }
+      // Keep the dock state consistent with the page we just switched to.
+      if (panelStore.getSnapshot().open) panelStore.setOpen(false);
+    };
+
+    const fallbackToClipboard = () => {
       try {
         navigator.clipboard.writeText(context);
         // eslint-disable-next-line no-alert
@@ -776,23 +887,67 @@ function apply(ctx: any) {
       } catch {
         // ignore
       }
-    }
+    };
+
+    // Already on the conversation: paste immediately.
+    if (prefillConversationInput(context)) return;
+
+    focusConversation();
+
+    let attempts = 0;
+    const tick = () => {
+      attempts += 1;
+      if (prefillConversationInput(context)) return;
+      if (attempts >= 30) {
+        fallbackToClipboard();
+        return;
+      }
+      window.setTimeout(tick, 50);
+    };
+    window.setTimeout(tick, 60);
   };
 
   const panel = <PanelRoot onAnalyzeTask={handleAnalyzeTask} onPickWorkspace={onPickWorkspace} />;
 
   const disposers: Array<() => void> = [];
+
+  // Optional work-collapse decoration. Isolated: it must never abort the
+  // panel mount, because the sidebar entry is what makes the plugin visible.
   try {
     disposers.push(mountWorkCollapse(ctx.sessions));
-    disposers.push(mountSidebarEntry(toggle, () => panelStore.getSnapshot().open, panelStore.subscribe));
-    const layoutApi = mountPanelLayout({
-      renderPanel: () => panel,
-      collapseRoot: '',
-    });
-    panelLayoutApi.current = layoutApi;
-    disposers.push(() => layoutApi.dispose());
   } catch (error) {
-    console.error('[dsh-vaspflow] mount failed:', error);
+    console.warn('[dsh-vaspflow] work-collapse mount skipped:', error);
+  }
+
+  // DSH 0.2+: mount through the slot registry (sidebar nav row + main page).
+  // Older hosts keep the legacy grid-track/DOM mount as a fallback.
+  let mountedViaSlots = false;
+  try {
+    const slotMount = mountViaSlots(ctx, {
+      renderPanel: () => panel,
+      label: ENTRY_LABEL,
+      isOpen: () => panelStore.getSnapshot().open,
+      toggle,
+      subscribe: panelStore.subscribe,
+    });
+    mountedViaSlots = slotMount.mounted;
+    if (slotMount.mounted) disposers.push(slotMount.dispose);
+  } catch (error) {
+    console.error('[dsh-vaspflow] slot mount failed:', error);
+  }
+
+  if (!mountedViaSlots) {
+    try {
+      disposers.push(mountSidebarEntry(toggle, () => panelStore.getSnapshot().open, panelStore.subscribe));
+      const layoutApi = mountPanelLayout({
+        renderPanel: () => panel,
+        collapseRoot: '',
+      });
+      panelLayoutApi.current = layoutApi;
+      disposers.push(() => layoutApi.dispose());
+    } catch (error) {
+      console.error('[dsh-vaspflow] legacy DOM mount failed:', error);
+    }
   }
 
   ctx.effect(() => () => {

@@ -424,25 +424,25 @@ export function TreeView({ onTaskSelected }: {
     const treeNode = node as VaspTreeNode;
     const task = treeNode.__task;
     if (treeNode.__pending) {
-      return <span style={{ fontSize: 12, color: '#1677ff' }}>{node.title as string}</span>;
+      return <span style={{ fontSize: 15, color: '#1677ff' }}>{node.title as string}</span>;
     }
     if (treeNode.__failedReason) {
-      return <Tooltip title={treeNode.__failedReason}><span style={{ fontSize: 12, color: '#ff4d4f' }}>{node.title as string}</span></Tooltip>;
+      return <Tooltip title={treeNode.__failedReason}><span style={{ fontSize: 15, color: '#ff4d4f' }}>{node.title as string}</span></Tooltip>;
     }
     const content = task && task.is_vasp_task !== false ? (
       <Tooltip
         title={`体系: ${task.system} | ${task.status_record?.label ?? task.status}：${task.status_record?.reason ?? ''} | 最近观察: ${task.status_record?.observedAt ?? '-'} `}
         mouseEnterDelay={0.5}
       >
-        <span style={{ fontSize: 12 }}>
+        <span style={{ fontSize: 16 }}>
           {node.title as string}
-          <span style={{ color: 'var(--dsw-alias-label-tertiary, #999)', marginLeft: 8, fontSize: 10 }}>
+          <span style={{ color: 'var(--dsw-alias-label-tertiary, #999)', marginLeft: 8, fontSize: 13 }}>
             {task.n_ion_steps}步
           </span>
         </span>
       </Tooltip>
     ) : (
-      <span style={{ fontSize: 12, color: task ? 'var(--dsw-alias-label-secondary, #555)' : 'var(--dsw-alias-label-tertiary, #666)' }}>
+      <span style={{ fontSize: 16, color: task ? 'var(--dsw-alias-label-secondary, #555)' : 'var(--dsw-alias-label-tertiary, #666)' }}>
         {node.title as string}
       </span>
     );
@@ -483,7 +483,9 @@ export function TreeView({ onTaskSelected }: {
             onSelect={handleSelect}
             titleRender={titleRender}
             showIcon
-            style={{ fontSize: 12, background: 'transparent' }}
+            // No inline fontSize: an inline style outranks every scoped rule
+            // (even !important), which is what kept the tree unreadably small.
+            style={{ background: 'transparent' }}
           />
         )}
       </div>

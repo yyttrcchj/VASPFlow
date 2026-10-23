@@ -7,11 +7,15 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(scriptDir, '..');
 const pkg = JSON.parse(readFileSync(resolve(pluginRoot, 'package.json'), 'utf8'));
+// DSH 0.2.x moved to the slot-based client module system; this build targets
+// the 0.2 release line. Accept any 0.2.x so a patch release does not block install.
+const supportedDshMajorMinor = '0.2';
 const supportedDshVersion = '0.1.0-rc.6';
 
 const args = process.argv.slice(2);
@@ -61,8 +65,23 @@ function findCachedDsh() {
   return candidates[0]?.bin ?? null;
 }
 
+/**
+ * Locate a usable `dsh` entry point.
+ *
+ * Order: PATH, the DSH desktop app's bundled CLI (macOS/Windows/Linux), then
+ * the npm npx cache. The desktop installer does NOT put `dsh` on PATH, so the
+ * bundled CLI is the common case for end users.
+ */
 function findDshLauncher() {
   if (isDshOnPath()) return { command: 'dsh', args: [], source: 'PATH' };
+
+  for (const candidate of bundledDshCandidates()) {
+    if (existsSync(candidate)) {
+      // The bundled launcher is an executable script (or .cmd), not a JS file:
+      // run it directly so its own shebang/exec picks the Electron runtime.
+      return { command: candidate, args: [], source: 'DSH desktop app' };
+    }
+  }
 
   const cachedBin = findCachedDsh();
   if (cachedBin !== null) {
@@ -72,9 +91,37 @@ function findDshLauncher() {
   return null;
 }
 
+/**
+ * The `dsh` launcher shipped inside the desktop application bundle.
+ *
+ * The app ships an executable shim at `runtime/cli/bin/dsh` (a shell script on
+ * POSIX, a .cmd on Windows) that execs the Electron binary with the CLI entry
+ * point. Paths inside `app.asar` are not directly executable.
+ */
+function bundledDshCandidates() {
+  const posixRelative = join('Contents', 'Resources', 'runtime', 'cli', 'bin', 'dsh');
+  if (process.platform === 'darwin') {
+    return [
+      `/Applications/DeepSeek Harness.app/${posixRelative}`,
+      join(homedir(), 'Applications', 'DeepSeek Harness.app', posixRelative),
+    ];
+  }
+  if (process.platform === 'win32') {
+    return ['LOCALAPPDATA', 'ProgramFiles', 'ProgramFiles(x86)']
+      .map((key) => process.env[key])
+      .filter((root) => typeof root === 'string' && root.length > 0)
+      .map((root) => join(root, 'DeepSeek Harness', 'resources', 'runtime', 'cli', 'bin', 'dsh.cmd'));
+  }
+  return [
+    '/usr/lib/deepseek-harness/resources/runtime/cli/bin/dsh',
+    '/opt/DeepSeek Harness/resources/runtime/cli/bin/dsh',
+  ];
+}
+
 function runDsh(launcher, args, options = {}) {
   return spawnSync(launcher.command, [...launcher.args, ...args], {
-    shell: launcher.command === 'dsh' && process.platform === 'win32',
+    // .cmd shims need a shell on Windows; plain executables must not use one.
+    shell: process.platform === 'win32' && /\.cmd$/i.test(launcher.command),
     ...options,
   });
 }
@@ -152,12 +199,12 @@ if (process.exitCode === undefined) {
     if (!dshVersion.ok) {
       console.error('Could not determine the installed DSH version. Run "dsh --version" and make sure it works before installing VASPFlow.');
       process.exitCode = 1;
-    } else if (dshVersion.version !== supportedDshVersion) {
-      console.error(`VASPFlow ${pkg.version} supports DSH ${supportedDshVersion}; found ${dshVersion.version}.`);
-      console.error(`Install the supported version with: npm install -g @deepseek-ai/dsh@${supportedDshVersion}`);
+    } else if (!dshVersion.version.startsWith(`${supportedDshMajorMinor}.`)) {
+      console.error(`VASPFlow ${pkg.version} supports the DSH ${supportedDshMajorMinor}.x line; found ${dshVersion.version}.`);
+      console.error(`Install a supported version with: npm install -g @deepseek-ai/dsh@${supportedDshVersion}`);
       process.exitCode = 1;
     } else {
-      console.log(`DSH ${supportedDshVersion} detected via ${launcher.source}. Installing ${packageSpec} into profile "${profile}"...`);
+      console.log(`DSH ${dshVersion.version} detected via ${launcher.source}. Installing ${packageSpec} into profile "${profile}"...`);
       const pluginResult = runDsh(launcher, ['plugin', '--profile', profile, 'add', packageSpec], {
         cwd: process.cwd(),
         env,

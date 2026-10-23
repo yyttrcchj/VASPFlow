@@ -1,63 +1,42 @@
+#!/usr/bin/env node
+
 /**
- * Install VASPFlow's bundled Agent preset into one DSH home directory.
+ * Explain how the bundled VASP preset reaches DSH.
  *
- * The script never overwrites an existing preset unless --replace is explicit.
- * A replaced preset is renamed to a timestamped backup instead of deleted.
+ * DSH 0.2 declares Agent presets as ordinary cordis entries
+ * (`@deepseek-ai/dsh-agent-preset`) inside a bundle patch, and discovers them
+ * from the profile's composed tree. It does NOT scan a preset directory, so
+ * copying files into `$DSH_HOME/.agent-presets` has no effect on 0.2 hosts.
+ *
+ * The preset therefore ships as `preset/vasp.patch.yml`, listed in this
+ * package's `dsh.bundle.patch`. Installing the bundle is all that is needed.
  */
-import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const args = process.argv.slice(2);
-let dshHome = process.env.DSH_HOME || join(homedir(), '.dsh');
-let replace = false;
-
-for (let index = 0; index < args.length; index += 1) {
-  const arg = args[index];
-  if (arg === '--dsh-home') {
-    const value = args[index + 1];
-    if (!value) throw new Error('--dsh-home requires a directory path');
-    dshHome = value;
-    index += 1;
-  } else if (arg === '--replace') {
-    replace = true;
-  } else if (arg === '--help') {
-    console.log('Usage: node scripts/install-preset.mjs [--dsh-home <path>] [--replace]');
-    process.exit(0);
-  } else {
-    throw new Error(`Unknown option: ${arg}`);
-  }
-}
-
 const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const source = join(pluginRoot, 'preset', 'vasp');
-const destination = resolve(dshHome, '.agent-presets', 'vasp');
+const patch = join(pluginRoot, 'preset', 'vasp.patch.yml');
 
-if (!existsSync(source)) throw new Error(`Bundled preset not found: ${source}`);
+if (!existsSync(patch)) {
+  console.error(`Bundled preset patch not found: ${patch}`);
+  process.exitCode = 1;
+} else {
+  const pkg = JSON.parse(readFileSync(join(pluginRoot, 'package.json'), 'utf8'));
+  const patches = pkg.dsh?.bundle?.patch;
+  const listed = Array.isArray(patches)
+    ? patches.some((entry) => entry.includes('vasp.patch.yml'))
+    : false;
 
-let backup = null;
-if (existsSync(destination)) {
-  if (!replace) {
-    console.log(`Preset already exists and was not changed: ${destination}`);
-    console.log('Run again with --replace to install this bundled version and keep a backup.');
-    process.exit(0);
+  if (!listed) {
+    console.error('preset/vasp.patch.yml is not listed in dsh.bundle.patch; the preset will not load.');
+    process.exitCode = 1;
+  } else {
+    console.log('The VASP Agent preset ships inside this bundle and loads with it.');
+    console.log(`  patch: ${patch}`);
+    console.log('');
+    console.log('No separate copy step is needed on DSH 0.2: presets are declared');
+    console.log('through dsh.bundle.patch, not discovered from a preset directory.');
+    console.log('Restart DSH, then choose “VASP 计算助手” when creating a session.');
   }
-  backup = `${destination}.backup-${Date.now()}`;
-  renameSync(destination, backup);
 }
-
-const staging = `${destination}.tmp-${process.pid}-${Date.now()}`;
-try {
-  mkdirSync(dirname(destination), { recursive: true });
-  cpSync(source, staging, { recursive: true, errorOnExist: true });
-  renameSync(staging, destination);
-} catch (error) {
-  rmSync(staging, { recursive: true, force: true });
-  if (backup !== null && !existsSync(destination)) renameSync(backup, destination);
-  throw error;
-}
-
-console.log(`Installed VASPFlow Agent preset: ${destination}`);
-if (backup !== null) console.log(`Previous preset backup: ${backup}`);
-console.log('Restart DSH, then choose “VASP 计算助手” when creating a new session.');

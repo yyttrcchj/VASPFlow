@@ -51,3 +51,10 @@ preset-construction/build/sample-vasp/
 /output/
 /test/
 plugins/dsh-vaspflow/.vaspflow-development
+
+# ---- macOS AppleDouble metadata (created by non-HFS volumes) ----
+._*
+.DS_Store
+
+# ---- build artifacts: do not commit npm tarballs ----
+*.tgz
