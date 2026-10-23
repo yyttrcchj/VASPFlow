@@ -801,7 +801,7 @@ function apply(ctx: any) {
       name: 'tool.call.toolview',
       key: 'vasp_build_inputs',
     }, BuildInputsToolRow));
-    for (const toolName of ['vasp_scan', 'vasp_inspect_task', 'vasp_inspect_tasks', 'vasp_convergence', 'vasp_structure_scene', 'vasp_discover_inputs', 'vasp_check_inputs', 'vasp_say', 'vasp_done']) {
+    for (const toolName of ['vasp_scan', 'vasp_inspect_task', 'vasp_inspect_tasks', 'vasp_convergence', 'vasp_collect_results', 'vasp_structure_scene', 'vasp_discover_inputs', 'vasp_check_inputs', 'vasp_say', 'vasp_done']) {
       ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
         name: 'tool.call.toolview',
         key: toolName,

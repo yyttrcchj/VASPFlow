@@ -99674,6 +99674,7 @@ var StructureViewer = ({ taskId, rootPath, relPath, inlineScene, inlineLabel, so
   const [structure, setStructure] = (0, import_react165.useState)(() => inlineScene ? structureSceneToViewerStructure(inlineScene) : null);
   const [loading, setLoading] = (0, import_react165.useState)(!inlineScene);
   const [error, setError] = (0, import_react165.useState)(null);
+  const [renderError, setRenderError] = (0, import_react165.useState)(null);
   const [showBonds, setShowBonds] = (0, import_react165.useState)(true);
   const [showCell, setShowCell] = (0, import_react165.useState)(true);
   const [displayStyle, setDisplayStyle] = (0, import_react165.useState)("ball-stick");
@@ -99705,7 +99706,20 @@ var StructureViewer = ({ taskId, rootPath, relPath, inlineScene, inlineLabel, so
     camera.position.set(0, 0, 100);
     camera.zoom = 1;
     camera.updateProjectionMatrix();
-    const renderer = new WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    let renderer;
+    try {
+      renderer = new WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    } catch {
+      setRenderError("\u65E0\u6CD5\u521B\u5EFA 3D \u89C6\u56FE\uFF0C\u8BF7\u70B9\u51FB\u590D\u4F4D\u91CD\u8BD5");
+      return;
+    }
+    const onContextLost = (event) => {
+      event.preventDefault();
+      setRenderError("3D \u56FE\u5F62\u4E0A\u4E0B\u6587\u5DF2\u4E2D\u65AD\uFF0C\u8BF7\u70B9\u51FB\u590D\u4F4D\u91CD\u8BD5");
+    };
+    const onContextRestored = () => setRenderError(null);
+    renderer.domElement.addEventListener("webglcontextlost", onContextLost);
+    renderer.domElement.addEventListener("webglcontextrestored", onContextRestored);
     renderer.setClearColor(scene.background, 1);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(mount.clientWidth, mount.clientHeight);
@@ -100266,6 +100280,7 @@ var StructureViewer = ({ taskId, rootPath, relPath, inlineScene, inlineLabel, so
         applySettingsRef.current?.();
       }, children: "\u6E05\u9664" })
     ] }),
+    renderError && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { role: "alert", style: { padding: "6px 10px", borderRadius: 6, background: "rgba(196,65,54,.1)", color: "#c44136", fontSize: 13 }, children: renderError }),
     /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
       "div",
       {
@@ -103360,7 +103375,7 @@ function apply(ctx) {
       name: "tool.call.toolview",
       key: "vasp_build_inputs"
     }, BuildInputsToolRow));
-    for (const toolName of ["vasp_scan", "vasp_inspect_task", "vasp_inspect_tasks", "vasp_convergence", "vasp_structure_scene", "vasp_discover_inputs", "vasp_check_inputs", "vasp_say", "vasp_done"]) {
+    for (const toolName of ["vasp_scan", "vasp_inspect_task", "vasp_inspect_tasks", "vasp_convergence", "vasp_collect_results", "vasp_structure_scene", "vasp_discover_inputs", "vasp_check_inputs", "vasp_say", "vasp_done"]) {
       ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
         name: "tool.call.toolview",
         key: toolName

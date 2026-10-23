@@ -40,9 +40,10 @@ import { buildInputs } from './host/input-builder.js';
 import { checkInputs, checkOneDir, buildInputCheck, INPUT_CHECK_PROFILES } from './host/input-checker.js';
 import { srcInspect } from './host/src-inspect.js';
 import { scanTemplates } from './host/scan-templates.js';
+import { collectResults } from './host/result-collector.js';
 import { fileURLToPath } from 'node:url';
 import { join as joinPath, basename, dirname, resolve as resolvePath, relative as relativePath, isAbsolute, sep } from 'node:path';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, statSync, realpathSync } from 'node:fs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -386,6 +387,39 @@ export function registerVaspTools(ctx, store, buildPlans = new Map(), buildMode 
   }));
 
   ctx.tools.register(defineTool({
+    name: 'vasp_collect_results',
+    description: '按父目录深度与精确任务路径的并集，批量读取弛豫或频率/ZPE 计算的逐任务数值。一次调用只查一种计算类别；返回每项数值、单位、来源字段和缺失原因。',
+    parameters: {
+      rootPath: { type: 'string', required: true, description: '项目根目录绝对路径。' },
+      scope: { type: 'object', required: true, additionalProperties: false, properties: {
+        subtrees: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+          relPath: { type: 'string', required: true }, maxDepth: { type: 'number', required: true },
+        } }, description: '可选：父目录及向下查找层数；0 只查父目录本身，最大 20。' },
+        taskPaths: { type: 'array', items: { type: 'string' }, description: '可选：精确任务路径，只查所列任务本身。' },
+      } },
+      calculationType: { type: 'string', required: true, enum: ['RELAXATION', 'FREQUENCY_ZPE'], description: '单次仅一种计算类别。' },
+      metrics: { type: 'array', required: true, items: { type: 'string' }, description: '弛豫：last_ionic_free_energy、last_max_force、ionic_steps；频率：frequencies、zpe、vibrational_entropy、vibrational_free_energy。' },
+      conditions: { type: 'object', additionalProperties: false, properties: { temperatureK: { type: 'number', description: '计算振动熵/自由能时必填，单位 K。' } } },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: false, properties: {
+        query: { type: 'object', additionalProperties: true },
+        summary: { type: 'object', additionalProperties: true },
+        rows: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        excluded: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        error: { type: 'string', required: true },
+      } },
+      render: (_args, value) => [{ type: 'text', text: value.error ? `查看计算数据失败：${value.error}` : clipRenderText(`${value.summary.included} 个 ${value.query.calculationType} 任务；${value.summary.partial} 个指标缺失或无效，${value.summary.excluded} 个路径/其他类别排除。\n${value.rows.map((row) => `${row.relPath} (${row.composition || '组成未知'}): ${Object.entries(row.values).map(([key, item]) => `${key}=${item.status === 'ok' ? Array.isArray(item.value) ? `${item.value.length} 个模式` : `${item.value} ${item.unit}` : `${item.status}(${item.note})`}`).join('；')}`).join('\n')}\n${value.excluded.map((row) => `${row.relPath}: ${row.reason}`).join('\n')}`) }],
+      presentationMeta: (_args, value) => ({ rootPath: value.query?.rootPath, query: value.query, summary: value.summary, rows: value.rows, excluded: value.excluded, error: value.error }),
+    },
+    async execute(args) {
+      try { return await collectResults(args); }
+      catch (caught) { return { query: args, summary: { discovered: 0, included: 0, excluded: 0, complete: 0, partial: 0 }, rows: [], excluded: [], error: `结果解析失败：${String(caught)}` }; }
+    },
+    presentCall: (args) => ({ card: 'generic', title: args.calculationType === 'FREQUENCY_ZPE' ? '查看频率与 ZPE' : '查看弛豫数据', kind: 'other', rawInput: args }),
+  }));
+
+  ctx.tools.register(defineTool({
     name: 'vasp_convergence',
     description: '读取 1–12 个 VASP 任务的收敛数据；每个任务独立给出离子步、能量和最大力，可在对话中切换比较。',
     parameters: {
@@ -433,12 +467,12 @@ export function registerVaspTools(ctx, store, buildPlans = new Map(), buildMode 
 
   ctx.tools.register(defineTool({
     name: 'vasp_structure_scene',
-    description: '读取 1–12 个结构文件并直接在对话中显示 3D 场景；可跨任务比较，每个结构独立标签页。',
+    description: '读取 1–20 个结构文件并直接在对话中显示 3D 场景；支持 NEB image 目录和独立结构文件，不要求目录内存在完整 VASP 输入；每个结构独立标签页。',
     parameters: {
       rootPath: { type: 'string', required: true, description: '项目根目录绝对路径。' },
       structures: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
-        relPath: { type: 'string', required: true }, file: { type: 'string', description: '结构文件名，默认 CONTCAR。' },
-      } }, description: '1–12 个结构引用，可来自不同任务，也可比较同一任务不同文件。' },
+        relPath: { type: 'string', required: true, description: '相对项目根目录的结构所在目录，可为 NEB image 或普通目录。' }, file: { type: 'string', description: '结构文件名，默认 CONTCAR。' },
+      } }, description: '1–20 个结构引用，可来自不同任务，也可比较同一任务不同文件。' },
     },
     output: {
       schema: {
@@ -462,16 +496,28 @@ export function registerVaspTools(ctx, store, buildPlans = new Map(), buildMode 
       const rootError = directoryError(args.rootPath);
       if (rootError) return { root_path: args.rootPath, results: [], error: rootError };
       const structures = args.structures ?? [];
-      if (structures.length < 1 || structures.length > 12) return { root_path: args.rootPath, results: [], error: '请提供 1–12 个结构' };
+      if (structures.length < 1 || structures.length > 20) return { root_path: args.rootPath, results: [], error: '请提供 1–20 个结构' };
       const results = structures.map(({ relPath, file = 'CONTCAR' }) => {
-        const info = taskAtPath(args.rootPath, relPath);
-        if (!info) return { rel_path: relPath, file, error: '未找到 VASP 任务' };
-        const filePath = resolveTaskFile(info, file);
-        if (!filePath) return { rel_path: info.rel_path, file, error: '未找到结构文件' };
+        // Any directory inside the project can hold a structure: NEB image
+        // folders carry only POSCAR/CONTCAR, not the full input set, so the
+        // scanner's "is this a VASP task" test must not gate the viewer.
         try {
+          const root = resolvePath(args.rootPath);
+          const directory = resolvePath(root, String(relPath ?? '.').replace(/\\/g, '/'));
+          const relative = relativePath(root, directory);
+          if (isAbsolute(relative) || relative === '..' || relative.startsWith(`..${sep}`)) {
+            return { rel_path: relPath, file, error: '结构目录必须位于项目根目录内' };
+          }
+          const info = { root_path: root, rel_path: normalizeRelPath(relative) };
+          const filePath = resolveTaskFile(info, file);
+          if (!filePath) return { rel_path: info.rel_path, file, error: '未找到结构文件' };
+          const realRelative = relativePath(realpathSync(root), realpathSync(filePath));
+          if (isAbsolute(realRelative) || realRelative === '..' || realRelative.startsWith(`..${sep}`)) {
+            return { rel_path: info.rel_path, file, error: '结构文件必须位于项目根目录内' };
+          }
           return { ...getStructureScene(filePath, { includeConnectivity: true, bondAlgorithm: 'minimum-distance' }), rel_path: info.rel_path, file, error: '' };
         } catch (caught) {
-          return { rel_path: info.rel_path, file, error: `结构解析失败：${String(caught)}` };
+          return { rel_path: relPath, file, error: `结构解析失败：${String(caught)}` };
         }
       });
       return { root_path: args.rootPath, results, error: '' };

@@ -3,7 +3,7 @@
  * (three.js direct, no react-three-fiber): orthographic camera, atom spheres,
  * bonds, unit cell, orbit/pan/zoom, camera memory, structure file tabs.
  */
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Spin, Empty, Tabs, Tooltip, Button, Popover, Radio, Select, Slider, Switch } from 'antd';
@@ -175,6 +175,7 @@ const StructureViewer: React.FC<{ taskId?: number; rootPath?: string; relPath?: 
   const [structure, setStructure] = useState<ViewerStructure | null>(() => inlineScene ? structureSceneToViewerStructure(inlineScene) : null);
   const [loading, setLoading] = useState(!inlineScene);
   const [error, setError] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [showBonds, setShowBonds] = useState(true);
   const [showCell, setShowCell] = useState(true);
   const [displayStyle, setDisplayStyle] = useState<'ball-stick' | 'space-fill'>('ball-stick');
@@ -214,7 +215,23 @@ const StructureViewer: React.FC<{ taskId?: number; rootPath?: string; relPath?: 
     camera.zoom = 1;
     camera.updateProjectionMatrix();
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    // WebGL can fail outright (GPU reset, too many live contexts) or be lost at
+    // runtime. Surface it instead of leaving a blank canvas, and listen for
+    // loss/restore so the user can retry through the reset control.
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    } catch {
+      setRenderError('无法创建 3D 视图，请点击复位重试');
+      return;
+    }
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      setRenderError('3D 图形上下文已中断，请点击复位重试');
+    };
+    const onContextRestored = () => setRenderError(null);
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost);
+    renderer.domElement.addEventListener('webglcontextrestored', onContextRestored);
     renderer.setClearColor(scene.background as THREE.Color, 1);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(mount.clientWidth, mount.clientHeight);
@@ -773,6 +790,11 @@ const StructureViewer: React.FC<{ taskId?: number; rootPath?: string; relPath?: 
         </span>
       </div>
       {measurement && <div className="vfp-structure-measurement" role="status">{measurement}<button type="button" onClick={() => { selectedAtomsRef.current = []; setSelectedAtoms([]); applySettingsRef.current?.(); }}>清除</button></div>}
+      {renderError && (
+        <div role="alert" style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(196,65,54,.1)', color: '#c44136', fontSize: 13 }}>
+          {renderError}
+        </div>
+      )}
       <div
         ref={mountRef}
         key={sceneNonce}
