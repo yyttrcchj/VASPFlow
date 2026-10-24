@@ -130,6 +130,7 @@ $DSH plugin --profile desktop add "$(pwd)"
 | 客户端依赖 | `dsh-client-runtime`（0.2 已删除） | locale / layout / sidebar 三个真实包 |
 | Agent 预设 | 复制文件到 `.agent-presets/` | `@deepseek-ai/dsh-agent-preset` 条目 + `dsh.bundle.patch` 声明 |
 | 预设 `persona` | `text` 字段 | `prefix` 字段（0.2 schema 要求） |
+| persona 模板变量 | `{{model}}` / `{{cwd}}` 都可用 | 只有 `{{provider}}` / `{{model}}`；工作目录改走 runtime context |
 | 本地工具引用 | `./tools/x.mjs` 相对路径 | 包子路径（`name` 必须是字面量） |
 | 对话输入框 | `<textarea>` | Lexical 富文本，合成 paste 注入 |
 | workflow 引擎 | `dsh-workflow-worker-thread` | `dsh-workflow-ptc` |
@@ -145,6 +146,8 @@ $DSH plugin --profile desktop add "$(pwd)"
 | `dsh: command not found` | 桌面版不写 PATH | 用第 1 步表格里的完整路径 |
 | 装完侧边栏没有 VASP | profile 装错了 | 确认 `--profile` 是 `desktop`（桌面版）还是 `web`（命令行） |
 | 预设显示「加载失败」 | 预设声明有问题 | 看红框里的文字，对照下表 |
+| 每条消息都报 `unknown prompt variable "{{cwd}}"` | persona 用了 0.2 已移除的变量 | 见下方[「`{{cwd}}` 报错」](#cwd-报错已修复) |
+| 回复内容不渲染 Markdown，`**粗体**` 原样显示 | 旧版 bundle | 重新构建：`node scripts/build-client.mjs` |
 | 面板能开但字很小 | 样式没生效 | 重新构建：`node scripts/build-client.mjs` |
 | 点「分析此任务」提示找不到输入框 | 旧版 bundle | 重新构建；新版会先切回会话再注入 |
 | 面板空白、无任务 | 路径填的是单个计算目录 | 填**上一层**的项目根目录 |
@@ -159,6 +162,44 @@ $DSH plugin --profile desktop add "$(pwd)"
 | `waiting for service: agentPresets` | 该 profile 没有预设注册表 | 换用 `desktop` 或 `web` 这类完整 profile |
 
 所有报错都能在 `~/Library/Logs/DeepSeek Harness/`（macOS）或应用日志里找到完整堆栈。
+
+### `{{cwd}}` 报错（已修复）
+
+如果你用的是 0.4.0 之前的版本，选中「VASP 计算助手」后**每条消息都会立刻失败**，一个 token 都收不到：
+
+```
+unknown prompt variable "{{cwd}}" in section "deployment:persona-prefix";
+registered variables: provider, model
+```
+
+**原因**：DSH 0.1.x 的 agent loop 注册 `model` 和 `cwd` 两个模板变量，所以上游写法在 0.1 上是对的。0.2.x 把契约改了——只注册 `provider` 和 `model`，工作目录改为通过**必需的 runtime context** 注入。而提示词注册表对 `{{...}}` 是严格校验的，遇到未注册变量直接抛错。
+
+**修复**：从 persona 里删掉 `{{cwd}}` 引用。工作目录信息不会丢，它本来就会以 `Current working directory: "..."` 出现在 runtime context 里。
+
+```diff
+  prefix: >-
+    你是一名由 {{model}} 模型驱动的 VASP 计算化学编码 Agent。
+-   你的工作目录是 {{cwd}}。
+```
+
+这个修复已包含在当前版本中（`92faacd`）。已同步反馈给上游：[`21271122/VASPFlow#1`](https://github.com/21271122/VASPFlow/issues/1)。
+
+> 如果自己改过 `preset/vasp.patch.yml`，注意别再写回 `{{cwd}}`。
+
+### `vasp_say` 回复的显示效果（0.4.0 起）
+
+`vasp` 预设不让模型输出 assistant 正文，所有回答都通过 `vasp_say` 工具交付，所以**工具行就是回复本身**。0.4.0 修了两个显示问题：
+
+| 问题 | 原因 | 现在的行为 |
+|---|---|---|
+| Markdown 不渲染，`**粗体**`、反引号原样显示 | 容器带了 `white-space: pre-wrap`，把排版压平 | 复用宿主自己的 Markdown 渲染器，排版与正常回复一致 |
+| 回复整段突然出现 | 输出校验必须先收完整候选才能决定是否放行，token 流到不了客户端 | 校验通过后按长度渐进显现（约 0.9–2.4 秒）；历史消息和重新打开会话不重播动画 |
+
+如果这两项没生效，多半是 bundle 还是旧的——重新构建即可：
+
+```bash
+cd plugins/dsh-vaspflow && node scripts/build-client.mjs
+```
 
 ---
 
