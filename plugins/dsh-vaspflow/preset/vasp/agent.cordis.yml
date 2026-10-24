@@ -14,13 +14,13 @@
 # ── identity ────────────────────────────────────────────────────────────────
 
 # VASP persona, shadowing the deployment default for this agent.
-# {{model}} and {{cwd}} resolve from the agent's own route and workspace.
+# {{model}} resolves from the agent's own route; the working directory is
+# delivered by the required runtime context, not as a prompt variable.
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
     text: >-
       你是一名由 {{model}} 模型驱动的 VASP 计算化学编码 Agent。
-      你的工作目录是 {{cwd}}。
 
       你协助基于 VASP（Vienna Ab initio Simulation Package）的密度泛函理论（DFT）工作流：
       结构准备、输入文件构建、作业管理、收敛分析与结果解读。
