@@ -101599,6 +101599,56 @@ function argsOf(block) {
     return {};
   }
 }
+var markdownPrimitive;
+function resolveMarkdownPrimitive() {
+  if (markdownPrimitive !== void 0) return markdownPrimitive;
+  try {
+    markdownPrimitive = require("@deepseek-ai/dsh-client-ui-primitives") ?? null;
+  } catch {
+    markdownPrimitive = null;
+  }
+  return markdownPrimitive;
+}
+var MARKDOWN_LABELS = {
+  code: {
+    copyLabel: "\u590D\u5236",
+    copiedLabel: "\u5DF2\u590D\u5236",
+    toolbarLabels: { codeLabel: "\u4EE3\u7801", wrapLabel: "\u81EA\u52A8\u6362\u884C", unwrapLabel: "\u53D6\u6D88\u6362\u884C" }
+  },
+  footnotes: "\u811A\u6CE8"
+};
+var REVEAL_TARGET_MS = 900;
+var REVEAL_MAX_MS = 2400;
+var REVEAL_FRAME_MS = 34;
+function useRevealedText(text, animate) {
+  const [revealed, setRevealed] = (0, import_react168.useState)(() => animate ? 0 : text.length);
+  (0, import_react168.useEffect)(() => {
+    if (!animate) {
+      setRevealed(text.length);
+      return;
+    }
+    setRevealed(0);
+    const total = Math.min(REVEAL_MAX_MS, Math.max(REVEAL_TARGET_MS, text.length * 2));
+    const frames = Math.max(1, Math.round(total / REVEAL_FRAME_MS));
+    const perFrame = Math.max(1, Math.ceil(text.length / frames));
+    let shown = 0;
+    const timer = window.setInterval(() => {
+      shown = Math.min(text.length, shown + perFrame);
+      setRevealed(shown);
+      if (shown >= text.length) window.clearInterval(timer);
+    }, REVEAL_FRAME_MS);
+    return () => window.clearInterval(timer);
+  }, [text, animate]);
+  return revealed >= text.length ? text : text.slice(0, revealed);
+}
+function VaspSayBody({ text, animate }) {
+  const visible = useRevealedText(text, animate);
+  const primitive = resolveMarkdownPrimitive();
+  if (primitive?.MarkdownText) {
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(primitive.MarkdownText, { text: visible, labels: MARKDOWN_LABELS });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "vfp-say-plain", children: visible });
+}
 function valueOf(block) {
   return block?.result?.meta ?? block?.resultView?.meta ?? block?.result?.value ?? block?.meta ?? {};
 }
@@ -102267,7 +102317,10 @@ function VaspToolRow({ block, toolName }) {
   if (toolName === "vasp_say") {
     if (!settled) return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { "data-dsh-vaspflow-tool": "vasp_say", className: "vfp-tree-muted", children: "\u6B63\u5728\u51C6\u5907\u56DE\u590D\u2026" });
     if (toolError) return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { "data-dsh-vaspflow-tool": "vasp_say", className: "vfp-result-summary", "data-error": "", children: toolError });
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { "data-dsh-vaspflow-tool": "vasp_say", className: "vfp-say", "data-kind": args.kind, children: args.text });
+    const sayText = typeof args.text === "string" ? args.text : "";
+    if (!sayText.trim()) return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { "data-dsh-vaspflow-tool": "vasp_say", "data-complete": "", hidden: true });
+    const justSettled = typeof block?.time === "number" && Date.now() - block.time < 4e3;
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { "data-dsh-vaspflow-tool": "vasp_say", className: "vfp-say", "data-kind": args.kind, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(VaspSayBody, { text: sayText, animate: justSettled }) });
   }
   if (toolName === "vasp_done") return toolError ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { "data-dsh-vaspflow-tool": "vasp_done", className: "vfp-result-summary", "data-error": "", children: toolError }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { "data-dsh-vaspflow-tool": "vasp_done", "data-complete": "", hidden: true });
   const rootPath = value.rootPath ?? args.rootPath ?? value.projectRoot ?? args.projectRoot ?? panelStore.getSnapshot().projectPath;
@@ -102828,7 +102881,11 @@ var CSS = [
   "[data-dsh-vaspflow-tool] .vfp-inspection-detail b{font-weight:600;color:var(--dsw-alias-label-secondary,#65746b)}",
   "[data-dsh-vaspflow-tool] .vfp-inspection-detail span{grid-column:2}",
   "[data-dsh-vaspflow-tool] .vfp-inspection-detail button{border:0;background:none;padding:4px 0;color:#39ae78;cursor:pointer;font:inherit}",
-  '[data-dsh-vaspflow-tool="vasp_say"].vfp-say{font-size:15px;line-height:1.65;white-space:pre-wrap}',
+  // `vasp_say` is the preset's assistant turn: render it at host body scale and
+  // let the Markdown primitive own block layout. `pre-wrap` must NOT apply here
+  // — it would turn rendered Markdown back into literal whitespace.
+  '[data-dsh-vaspflow-tool="vasp_say"].vfp-say{font-size:var(--dsh-content-font-size,15px);line-height:1.65}',
+  '[data-dsh-vaspflow-tool="vasp_say"].vfp-say .vfp-say-plain{white-space:pre-wrap}',
   '[data-chat-flow-kind="tool-call"]:has([data-dsh-vaspflow-tool="vasp_done"][data-complete]){display:none!important}',
   "[data-vfp-work-first]>[data-vfp-work-summary]{display:flex;align-items:center;gap:8px;width:100%;min-height:30px;border:0;border-radius:6px;padding:3px 8px;background:var(--dsw-alias-interactive-bg-hover,rgba(100,120,150,.08));color:var(--dsw-alias-label-secondary,#65746b);text-align:left;font:inherit;font-size:13px;cursor:pointer}",
   '[data-vfp-work-first]>[data-vfp-work-summary]::before{content:"\u25B8";font-size:12px}',

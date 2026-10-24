@@ -23,6 +23,83 @@ function argsOf(block: any): any {
   try { return typeof raw === 'string' ? JSON.parse(raw) : {}; } catch { return {}; }
 }
 
+/**
+ * Render `vasp_say` prose the way the host renders assistant Markdown.
+ *
+ * The host owns the Markdown primitive: `@deepseek-ai/dsh-client-ui-primitives`
+ * exports `MarkdownText`, and every first-party tool view reuses it instead of
+ * re-implementing a parser. Resolve it lazily (and defensively) so a host build
+ * without that module degrades to plain text instead of throwing — a throwing
+ * component blanks its whole slot entry.
+ */
+let markdownPrimitive: { MarkdownText: React.ComponentType<any> } | null | undefined;
+
+function resolveMarkdownPrimitive(): { MarkdownText: React.ComponentType<any> } | null {
+  if (markdownPrimitive !== undefined) return markdownPrimitive;
+  try {
+    markdownPrimitive = require('@deepseek-ai/dsh-client-ui-primitives') ?? null;
+  } catch {
+    markdownPrimitive = null;
+  }
+  return markdownPrimitive;
+}
+
+/** Chrome copy for code fences and footnotes; ordinary prose needs none of it. */
+const MARKDOWN_LABELS = {
+  code: {
+    copyLabel: '复制',
+    copiedLabel: '已复制',
+    toolbarLabels: { codeLabel: '代码', wrapLabel: '自动换行', unwrapLabel: '取消换行' },
+  },
+  footnotes: '脚注',
+};
+
+/**
+ * Reveal a finished reply progressively instead of popping it in whole.
+ *
+ * The VASP output gate must hold an entire candidate before it can accept or
+ * discard it (a rejected candidate may not publish a single chunk), so the
+ * model's own token stream never reaches the client. This replays the accepted
+ * text the way a stream would have looked: the same characters, revealed in
+ * order, at a readable pace that scales with length.
+ *
+ * Only meaningful right after the block settles. History replays and re-mounts
+ * render the text at once, so scrolling back never re-animates a reply.
+ */
+const REVEAL_TARGET_MS = 900;
+const REVEAL_MAX_MS = 2400;
+const REVEAL_FRAME_MS = 34;
+
+function useRevealedText(text: string, animate: boolean): string {
+  const [revealed, setRevealed] = useState(() => (animate ? 0 : text.length));
+
+  useEffect(() => {
+    if (!animate) { setRevealed(text.length); return; }
+    setRevealed(0);
+    const total = Math.min(REVEAL_MAX_MS, Math.max(REVEAL_TARGET_MS, text.length * 2));
+    const frames = Math.max(1, Math.round(total / REVEAL_FRAME_MS));
+    const perFrame = Math.max(1, Math.ceil(text.length / frames));
+    let shown = 0;
+    const timer = window.setInterval(() => {
+      shown = Math.min(text.length, shown + perFrame);
+      setRevealed(shown);
+      if (shown >= text.length) window.clearInterval(timer);
+    }, REVEAL_FRAME_MS);
+    return () => window.clearInterval(timer);
+  }, [text, animate]);
+
+  return revealed >= text.length ? text : text.slice(0, revealed);
+}
+
+function VaspSayBody({ text, animate }: { text: string; animate: boolean }) {
+  const visible = useRevealedText(text, animate);
+  const primitive = resolveMarkdownPrimitive();
+  if (primitive?.MarkdownText) {
+    return <primitive.MarkdownText text={visible} labels={MARKDOWN_LABELS} />;
+  }
+  return <div className="vfp-say-plain">{visible}</div>;
+}
+
 function valueOf(block: any): any {
   return block?.result?.meta ?? block?.resultView?.meta ?? block?.result?.value ?? block?.meta ?? {};
 }
@@ -429,7 +506,12 @@ export function VaspToolRow({ block, toolName }: { block: any; toolName: string 
   if (toolName === 'vasp_say') {
     if (!settled) return <div data-dsh-vaspflow-tool="vasp_say" className="vfp-tree-muted">正在准备回复…</div>;
     if (toolError) return <div data-dsh-vaspflow-tool="vasp_say" className="vfp-result-summary" data-error="">{toolError}</div>;
-    return <div data-dsh-vaspflow-tool="vasp_say" className="vfp-say" data-kind={args.kind}>{args.text}</div>;
+    const sayText = typeof args.text === 'string' ? args.text : '';
+    if (!sayText.trim()) return <span data-dsh-vaspflow-tool="vasp_say" data-complete="" hidden />;
+    // Animate only a reply that just settled in this mount; scroll-back and
+    // session reloads paint the stored text immediately.
+    const justSettled = typeof block?.time === 'number' && Date.now() - block.time < 4000;
+    return <div data-dsh-vaspflow-tool="vasp_say" className="vfp-say" data-kind={args.kind}><VaspSayBody text={sayText} animate={justSettled} /></div>;
   }
   if (toolName === 'vasp_done') return toolError
     ? <div data-dsh-vaspflow-tool="vasp_done" className="vfp-result-summary" data-error="">{toolError}</div>

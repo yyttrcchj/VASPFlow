@@ -245,7 +245,11 @@ const CSS = [
   '[data-dsh-vaspflow-tool] .vfp-inspection-detail b{font-weight:600;color:var(--dsw-alias-label-secondary,#65746b)}',
   '[data-dsh-vaspflow-tool] .vfp-inspection-detail span{grid-column:2}',
   '[data-dsh-vaspflow-tool] .vfp-inspection-detail button{border:0;background:none;padding:4px 0;color:#39ae78;cursor:pointer;font:inherit}',
-  '[data-dsh-vaspflow-tool="vasp_say"].vfp-say{font-size:15px;line-height:1.65;white-space:pre-wrap}',
+  // `vasp_say` is the preset's assistant turn: render it at host body scale and
+  // let the Markdown primitive own block layout. `pre-wrap` must NOT apply here
+  // — it would turn rendered Markdown back into literal whitespace.
+  '[data-dsh-vaspflow-tool="vasp_say"].vfp-say{font-size:var(--dsh-content-font-size,15px);line-height:1.65}',
+  '[data-dsh-vaspflow-tool="vasp_say"].vfp-say .vfp-say-plain{white-space:pre-wrap}',
   '[data-chat-flow-kind="tool-call"]:has([data-dsh-vaspflow-tool="vasp_done"][data-complete]){display:none!important}',
   '[data-vfp-work-first]>[data-vfp-work-summary]{display:flex;align-items:center;gap:8px;width:100%;min-height:30px;border:0;border-radius:6px;padding:3px 8px;background:var(--dsw-alias-interactive-bg-hover,rgba(100,120,150,.08));color:var(--dsw-alias-label-secondary,#65746b);text-align:left;font:inherit;font-size:13px;cursor:pointer}',
   '[data-vfp-work-first]>[data-vfp-work-summary]::before{content:"▸";font-size:12px}',
