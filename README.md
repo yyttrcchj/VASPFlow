@@ -165,7 +165,7 @@ $DSH plugin --profile desktop add "$(pwd)"
 
 ### `{{cwd}}` 报错（已修复）
 
-如果你用的是 0.4.0 之前的版本，选中「VASP 计算助手」后**每条消息都会立刻失败**，一个 token 都收不到：
+如果你用的是 0.4.1 之前的版本，选中「VASP 计算助手」后**每条消息都会立刻失败**，一个 token 都收不到：
 
 ```
 unknown prompt variable "{{cwd}}" in section "deployment:persona-prefix";
@@ -186,9 +186,9 @@ registered variables: provider, model
 
 > 如果自己改过 `preset/vasp.patch.yml`，注意别再写回 `{{cwd}}`。
 
-### `vasp_say` 回复的显示效果（0.4.0 起）
+### `vasp_say` 回复的显示效果（0.4.1 起）
 
-`vasp` 预设不让模型输出 assistant 正文，所有回答都通过 `vasp_say` 工具交付，所以**工具行就是回复本身**。0.4.0 修了两个显示问题：
+`vasp` 预设不让模型输出 assistant 正文，所有回答都通过 `vasp_say` 工具交付，所以**工具行就是回复本身**。0.4.1 修了两个显示问题：
 
 | 问题 | 原因 | 现在的行为 |
 |---|---|---|
